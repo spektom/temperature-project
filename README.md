@@ -4,19 +4,19 @@ temperature-project
 Office temperature and humidity control system based on DHT22 sensor (attached to Raspberry PI).
 
 
-=== Screenshots ===
+### Screenshots ###
 
 ![Screenshot!](https://raw.github.com/spektom/temperature-project/master/screenshot.png)
 
 
-=== Running ===
+### Running ###
 
 1. Start Webapp process on any accessible server by running: `./webapp.py`
 
 2. Send temperature and humidity readings from Raspberry PI by running: `./read-temp.py <Webapp IP address>`
 
 
-=== Links ===
+### Links ###
 
 [DHT22 Technical Specification](http://www.adafruit.com/datasheets/DHT22.pdf)
 
