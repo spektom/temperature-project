@@ -1,0 +1,162 @@
+<html>
+<head>
+	<title>Ruckus IDC Temperature Project</title>
+	<link rel="icon" type="image/png" href="/static/icon.png" />
+	<link href="//maxcdn.bootstrapcdn.com/bootswatch/3.2.0/readable/bootstrap.min.css" rel="stylesheet" />
+	<link href="//cdn.jsdelivr.net/jquery.snowfall/1.5/styles.css" rel="stylesheet" />
+</head>
+
+<body>
+<div class="container">
+	<center>
+		<div class="alert alert-danger hide alert-dismissible" role="alert" style="margin-top:20px;">
+			<button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span></button>
+			Error reading temperature sensor! Please verify that it's positioned correctly.
+		</div>
+		<h2>Office Weather</h2>
+		<div class="btn-group">
+			<button type="button" class="btn btn-default" onclick="reload_charts(1);">Last hour</button>
+			<button type="button" class="btn btn-default" onclick="reload_charts(5);">Last 5 hours</button>
+			<button type="button" class="btn btn-default" onclick="reload_charts(24);">Last 24 hours</button>
+			<button type="button" class="btn btn-default" onclick="reload_charts(168);">Last week</button>
+		</div>
+
+		<div id="temp-chart" style="margin-top:40px; width:100%; height:300px;"></div>
+
+		<div id="humidity-chart" style="margin-top:40px; width:100%; height:300px;"></div>
+
+		<h4 style="margin-top:60px;">Recent sensor reading</h4>
+		<div style="margin-top:20px;">
+			<div style="margin-top:10px;">Temperature: <span id="latest-temp"></span>°C</div>
+			<div>Humidity: <span id="latest-hum"></span>%</div>
+			<div style="margin-top:15px;color:#666;font-size:.8em;">Last Update: <span id="lastUpdate"></span></div>
+		</div>
+
+		<div style="position:fixed;left:50;bottom:50;">
+			<img src="/static/dog.jpg">
+		</div>
+	</center>
+</div>
+
+	<script src="//cdn.jsdelivr.net/jquery/2.1.0/jquery.min.js"></script>
+	<script src="//netdna.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+	<script src="//cdn.jsdelivr.net/highstock/2.0.3/highstock.js"></script>
+	<script src="//cdn.jsdelivr.net/momentjs/2.7.0/moment.min.js"></script>
+	<script src="//cdn.jsdelivr.net/jquery.snowfall/1.5/snowfall.min.jquery.js"></script>
+
+	<script type="text/javascript">
+		var freq = 300000;
+		Highcharts.setOptions({
+			global: { useUTC : false },
+			colors: ['#50B432',  '#888', '#ED561B', '#24CBE5']
+		});
+
+		function update_latest(data, latest) {
+			if (data.length > 0) {
+				var lastUpdate = data[data.length-1][0];
+				$("#lastUpdate").text(moment(lastUpdate).fromNow());
+			}
+			$("#latest-temp").text(latest[0]);
+			$("#latest-hum").text(latest[1]);
+		}
+
+		function update_chart(data, idx, chart_id, chart_title, title_y) {
+			var timed_data = []
+			var avg = 0, max = 0, min = 100, startTime, endTime;
+			if (data.length > 0) {
+				var endTime = data[data.length-1][0];
+				startTime = data[0][0];
+				if (new Date().getTime() - endTime > freq*2) {
+					$(".alert").removeClass("hide");
+				} else {
+					$(".alert").addClass("hide");
+				}
+				for (var i = 0; i < data.length; ++i) {
+					var v = data[i][idx];
+					avg += v;
+					if (v > max) {
+						max = v;
+					}
+					if (v < min) {
+						min = v;
+					}
+					timed_data.push([data[i][0], v]);
+				}
+				avg /= data.length;
+				avg = Math.round(avg*10)/10;
+			}
+			$('#' + chart_id).highcharts({
+				chart: { zoomType: 'x'},
+				title: { text: chart_title },
+				credits: { enabled: false },
+				xAxis: {
+					type: 'datetime',
+					ordinal: true,
+					title: { text: 'Time' }
+				},
+				yAxis: { title: { text: title_y } },
+				series: [{
+					name: title_y,
+					type: 'spline',
+					marker: {
+						enabled: false,
+						states: { hover: { enabled: true } }
+					},
+					data: timed_data,
+					zIndex: 100
+				}, {
+					name: 'Average',
+					data: data.length > 0 ? [[startTime, avg], [endTime, avg]] : [],
+					marker: {
+						enabled: false,
+						states: { hover: { enabled: false } }
+					},
+					dashStyle: 'ShortDash',
+					zIndex: 50,
+					lineWidth: 1
+				}, {
+					name: 'Maximum',
+					data: data.length > 0 ? [[startTime, max], [endTime, max]] : [],
+					marker: {
+						enabled: false,
+						states: { hover: { enabled: false } }
+					},
+					dashStyle: 'ShortDash',
+					zIndex: 50,
+					lineWidth: 1
+				}, {
+					name: 'Minimum',
+					data: data.length > 0 ? [[startTime, min], [endTime, min]] : [],
+					marker: {
+						enabled: false,
+						states: { hover: { enabled: false } }
+					},
+					dashStyle: 'ShortDash',
+					zIndex: 50,
+					lineWidth: 1
+				}]
+			});
+		}
+
+		function reload_charts(last_hours) {
+			$(document).snowfall('clear');
+			if (last_hours) {
+				window.last_hours = last_hours;
+			} else {
+				last_hours = window.last_hours;
+			}
+			$.getJSON('/api/last/' + last_hours, function(r) {
+				if (parseFloat(r.latest.temperature) < 23.5) {
+					$(document).snowfall({shadow:true});
+				}
+
+				update_chart(r.data, 1, "temp-chart", "Temperature", "Temperature (°C)");
+				update_chart(r.data, 2, "humidity-chart", "Humidity", "Humidity (%)");
+				update_latest(r.data, r.latest);
+			});
+		}
+		reload_charts(5);
+		setInterval(reload_charts, freq);
+	</script>
+</body>
+</html>
